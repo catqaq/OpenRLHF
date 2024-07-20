@@ -50,6 +50,7 @@ class ActorPPOTrainer(PPOTrainer):
             self.strategy,
             self.reward_fn,
             vllm_engines=self.vllm_engines,
+            packing_samples=self.strategy.args.packing_samples,
         )
 
         # Create torch group with deepspeed rank 0 and all vllm ranks
@@ -173,6 +174,7 @@ class ActorModelRayActor(BasePPORole):
             target_modules=strategy.args.target_modules,
             lora_dropout=strategy.args.lora_dropout,
             ds_config=strategy.get_ds_train_config(is_actor=True),
+            packing_samples=strategy.args.packing_samples,
         )
 
         # configure tokenizer
@@ -278,7 +280,11 @@ class ActorModelRayActor(BasePPORole):
                         args.micro_train_batch_size,
                         True,
                         True,
-                        pretrain_dataset.collate_fn,
+                        (
+                            pretrain_dataset.collate_fn
+                            if not args.packing_samples
+                            else pretrain_dataset.packing_collate_fn
+                        ),
                     )
                 )
             )

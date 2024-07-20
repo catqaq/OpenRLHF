@@ -24,7 +24,11 @@ class CriticPPOTrainer(PPOTrainer):
             shuffle=True,
             drop_last=True,
             pin_memory=self.dataloader_pin_memory,
-            collate_fn=self.replay_buffer.collate_fn,
+            collate_fn=(
+                self.replay_buffer.collate_fn
+                if not self.strategy.args.packing_samples
+                else self.replay_buffer.packing_collate_fn
+            ),
         )
         device = torch.cuda.current_device()
 
@@ -78,6 +82,7 @@ class CriticModelRayActor(BasePPORole):
             lora_dropout=strategy.args.lora_dropout,
             ds_config=strategy.get_ds_train_config(is_actor=False),
             value_head_prefix=strategy.args.value_head_prefix,
+            packing_samples=strategy.args.packing_samples,
         )
         strategy.print(critic)
         strategy.print("reward normalization status: {}".format(strategy.args.normalize_reward))

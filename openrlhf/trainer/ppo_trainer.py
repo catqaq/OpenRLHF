@@ -116,6 +116,9 @@ class PPOTrainer(ABC):
         # Mixtral 8x7b
         self.aux_loss = self.args.aux_loss_coef > 1e-8
 
+        # packing samples (for vLLM)
+        self.packing_samples = getattr(self.args, "packing_samples", False)
+
         if self.kl_target:
             self.kl_ctl = AdaptiveKLController(init_kl_coef, kl_target, kl_horizon)
         else:
@@ -204,7 +207,9 @@ class PPOTrainer(ABC):
             shuffle=True,
             drop_last=True,
             pin_memory=self.dataloader_pin_memory,
-            collate_fn=self.replay_buffer.collate_fn,
+            collate_fn=(
+                self.replay_buffer.collate_fn if not self.packing_samples else self.replay_buffer.packing_collate_fn
+            ),
         )
         device = torch.cuda.current_device()
 
@@ -292,8 +297,13 @@ class PPOTrainer(ABC):
         # ptx loss
         if self.pretrain_dataloader is not None:
             data = next(self.pretrain_dataloader)
-            inputs = data[1].squeeze(1).to(torch.cuda.current_device())
-            attention_mask = data[2].squeeze(1).to(torch.cuda.current_device())
+            if self.packing_samples:
+                inputs = data[1].to(torch.cuda.current_device())
+                attention_mask = data[2].to(torch.cuda.current_device())
+            else:
+                inputs = data[1].squeeze(1).to(torch.cuda.current_device())
+                attention_mask = data[2].squeeze(1).to(torch.cuda.current_device())
+
             label = torch.where(
                 attention_mask.bool(),
                 inputs,

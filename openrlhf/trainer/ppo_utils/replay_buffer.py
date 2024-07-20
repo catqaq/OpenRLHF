@@ -52,7 +52,7 @@ def split_experience_batch(experience: Experience) -> List[BufferItem]:
     for key in keys:
         value = getattr(experience, key)
         vals = torch.unbind(value)
-        assert batch_size == len(vals)
+        assert batch_size == len(vals), f"key {key}, batch_size {batch_size} != len(vals) {len(vals)}"
         for i, v in enumerate(vals):
             batch_kwargs[i][key] = v
 
@@ -60,7 +60,7 @@ def split_experience_batch(experience: Experience) -> List[BufferItem]:
         batch_kwargs[i]["info"] = {}
     for k, v in experience.info.items():
         vals = torch.unbind(v)
-        assert batch_size == len(vals)
+        assert batch_size == len(vals), f"key {key}, batch_size {batch_size} != len(vals) {len(vals)}"
         for i, vv in enumerate(vals):
             batch_kwargs[i]["info"][k] = vv.item()
 
@@ -79,7 +79,7 @@ def zero_pad_sequences(sequences: List[torch.Tensor], side: str = "left") -> tor
     return torch.stack(padded_sequences, dim=0)
 
 
-def make_experience_batch(items: List[BufferItem]) -> Experience:
+def make_experience_batch(items: List[BufferItem], packing_samples=False) -> Experience:
     kwargs = {}
     keys = (
         "sequences",
@@ -92,7 +92,10 @@ def make_experience_batch(items: List[BufferItem]) -> Experience:
     )
     for key in keys:
         vals = [getattr(item, key) for item in items]
-        batch_data = zero_pad_sequences(vals, "left")
+        if not packing_samples:
+            batch_data = zero_pad_sequences(vals, "left")
+        else:
+            batch_data = torch.cat(vals + [torch.tensor([0])], dim=0)
         kwargs[key] = batch_data
 
     kwargs["info"] = {}
@@ -113,7 +116,8 @@ def remove_padding_in_sequences(items):
             item.attention_mask,
             item.action_mask,
         )
-        right_pad = (1 - act_mask.long()).sum()
+        assert len(act_mask.shape) == 1
+        right_pad = act_mask.long().flip(dims=[0]).argmax()
         right_pad = None if right_pad == 0 else -right_pad
 
         # left_pad for seq and att_mask
@@ -187,6 +191,10 @@ class NaiveReplayBuffer(ABC):
 
     def collate_fn(self, batch) -> Experience:
         experience = make_experience_batch(batch)
+        return experience
+
+    def packing_collate_fn(self, batch) -> Experience:
+        experience = make_experience_batch(batch, packing_samples=True)
         return experience
 
     def normalize(self, attribute: str, strategy) -> None:

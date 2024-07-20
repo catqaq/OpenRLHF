@@ -294,6 +294,9 @@ if __name__ == "__main__":
         "--apply_chat_template", action="store_true", default=False, help="Use HF tokenizer chat template"
     )
 
+    # Packing samples
+    parser.add_argument("--packing_samples", action="store_true", default=False)
+
     # wandb parameters
     parser.add_argument("--use_wandb", type=str, default=None)
     parser.add_argument("--wandb_org", type=str, default=None)
@@ -315,5 +318,10 @@ if __name__ == "__main__":
 
     if args.vllm_num_engines >= 1 and args.n_samples_per_prompt > 1 and not args.enable_prefix_caching:
         print("[Warning] Please --enable_prefix_caching to accelerate when --n_samples_per_prompt > 1.")
+
+    if args.packing_samples:
+        assert (
+            args.vllm_num_engines and args.vllm_num_engines > 0
+        ), "PPO `--packing_samples` only supports vLLM engine currently."
 
     train(args)
