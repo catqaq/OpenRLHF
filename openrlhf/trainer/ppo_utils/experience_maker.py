@@ -300,7 +300,12 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
             for key, tensor in tensors.items():
                 processed = [tensor[0, cumulative_lens[i] : cumulative_lens[i + 1] - 1] for i in range(len(seq_lens))]
                 tensors[key] = zero_pad_sequences(processed, "right", 0)
-            base_action_log_probs, action_log_probs, value, action_mask = [tensors[key] for key in tensors]
+            base_action_log_probs, action_log_probs, value, action_mask = (
+                tensors["base_action_log_probs"],
+                tensors["action_log_probs"],
+                tensors["value"],
+                tensors["action_mask"],
+            )
 
         # to devices
         base_action_log_probs, value = base_action_log_probs.to(device), value.to(device)
