@@ -95,7 +95,7 @@ def make_experience_batch(items: List[BufferItem], packing_samples=False) -> Exp
         if not packing_samples:
             batch_data = zero_pad_sequences(vals, "left")
         else:
-            batch_data = torch.cat(vals + [torch.tensor([0])], dim=0)
+            batch_data = torch.cat(vals + [torch.tensor([0])], dim=0).unsqueeze(0)
         kwargs[key] = batch_data
 
     kwargs["info"] = {}
